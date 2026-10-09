@@ -66,7 +66,14 @@ class Edge:
         """True when this edge takes every character no other edge of its state takes."""
         return CharClass.OTHER in self.input_classes
 
+    @property
+    def is_any(self) -> bool:
+        """True when this is the only edge of its state: it takes every character."""
+        return len(self.input_classes) == len(CharClass)
+
     def input_label(self) -> str:
+        if self.is_any:
+            return "any"
         if self.is_else:
             return "else"
         return " ".join(_dot_symbol(c) for c in self.input_classes)
@@ -81,17 +88,27 @@ def _dot_symbol(input_class: CharClass) -> str:
 
 
 def edges() -> list[Edge]:
-    """Group the transition table into diagram edges, in a stable order."""
+    """Group the transition table into diagram edges.
+
+    Within each state the specific edges come first, in input-class order,
+    and the catch-all ("else") edge comes last.
+    """
     groups: dict[tuple[State, State, OutputAction, bool], list[CharClass]] = {}
     for state in State:
         for input_class in CharClass:
             row = TRANSITION_TABLE[(state, input_class)]
             key = (state, row.next_state, row.output, row.event.is_error)
             groups.setdefault(key, []).append(input_class)
-    return [
+    result = [
         Edge(source, target, tuple(classes), output, is_error)
         for (source, target, output, is_error), classes in groups.items()
     ]
+    states = list(State)
+    classes = list(CharClass)
+    result.sort(
+        key=lambda e: (states.index(e.source), e.is_else, classes.index(e.input_classes[0]))
+    )
+    return result
 
 
 def edge_for(row: Transition) -> Edge | None:
@@ -171,7 +188,9 @@ def to_mermaid() -> str:
     """Mermaid ``stateDiagram-v2`` source (rendered by GitHub in Markdown)."""
     lines = ["stateDiagram-v2", "    direction LR", f"    [*] --> {INITIAL_STATE.value}"]
     for edge in edges():
-        if edge.is_else:
+        if edge.is_any:
+            label = "any"
+        elif edge.is_else:
             label = "other"
         else:
             label = ", ".join(_MERMAID_CLASS_NAMES[c] for c in edge.input_classes)
@@ -218,11 +237,28 @@ def _md_row(row: Transition) -> str:
     )
 
 
+def eof_table_markdown() -> str:
+    """What the machine does when the input ends in each state."""
+    rows = [
+        "| State at end of input | Accepted | Final state | Output | Event | Meaning |",
+        "|---|---|---|---|---|---|",
+    ]
+    for state in State:
+        row = EOF_TABLE[state]
+        rows.append(
+            f"| {state.value} | {'yes' if state in ACCEPTING_STATES else 'no'} "
+            f"| {row.next_state.value} | `{row.output.value}` | {_md_event(row.event)} | {row.action} |"
+        )
+    return "\n".join(rows)
+
+
 def compact_table_markdown() -> str:
     """The table with each state's 'other' characters merged into one row."""
     rows = ["| Current State | Input | Next State | Output |", "|---|---|---|---|"]
     for edge in edges():
-        if edge.is_else:
+        if edge.is_any:
+            inputs = "any character"
+        elif edge.is_else:
             inputs = "any other"
         else:
             inputs = ", ".join(_md_input(c) for c in edge.input_classes)
