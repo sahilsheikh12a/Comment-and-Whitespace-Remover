@@ -318,15 +318,16 @@ def render_log_tab(result: ProcessingResult) -> None:
         st.info("No transitions were recorded for this input.")
         return
     stats = result.statistics
-    st.caption(
-        f"{len(log):,} transitions recorded from the actual FSM run: one per input character "
-        "plus the final end-of-input transition. Emitted, Discarded and Buffer show exactly "
-        "what each step did with its character."
-    )
-    if not result.transition_log_complete:
+    if result.transition_log_complete:
+        st.caption(
+            f"{len(log):,} transitions recorded from the actual FSM run: one per input "
+            "character plus the final end-of-input transition. Emitted, Discarded and Buffer "
+            "show exactly what each step did with its character."
+        )
+    else:
         st.warning(
-            f"The log was capped at {len(log):,} of {stats.fsm_transitions:,} transitions. "
-            "The output and statistics still cover the whole input."
+            f"The log was capped at the first {len(log):,} of {stats.fsm_transitions:,} "
+            "transitions. The output and statistics still cover the whole input."
         )
     choice = st.radio("Show", list(_LOG_FILTERS), horizontal=True, key="log_filter")
     rows = [record_row(r) for r in log if _LOG_FILTERS[choice](r)]
@@ -368,6 +369,11 @@ def render_step_tab(result: ProcessingResult) -> None:
     last = len(log) - 1
     st.session_state.step = max(0, min(st.session_state.get("step", 0), last))
     step = st.session_state.step
+    if not result.transition_log_complete and result.statistics is not None:
+        st.caption(
+            f"Only the first {len(log):,} of {result.statistics.fsm_transitions:,} transitions "
+            "were recorded for this large input; the steps below cover those."
+        )
 
     buttons = st.columns(6)
     buttons[0].button("First", icon=":material/first_page:", on_click=_set_step, args=(0,),
