@@ -83,6 +83,7 @@ def init_state(examples: list[str]) -> None:
         "source": STARTER_SOURCE,
         "file_name": "source.c",
         "processed": False,
+        "step": 0,
         "upload_error": None,
         "example": examples[0] if examples else None,
         "whitespace_mode": WhitespaceMode.NORMALIZE.value,
@@ -97,12 +98,14 @@ def init_state(examples: list[str]) -> None:
 
 def on_process() -> None:
     st.session_state.processed = True
+    st.session_state.step = 0
 
 
 def on_clear() -> None:
     st.session_state.source = ""
     st.session_state.file_name = "source.c"
     st.session_state.processed = False
+    st.session_state.step = 0
     st.session_state.upload_error = None
 
 
@@ -113,6 +116,7 @@ def on_load_example() -> None:
     st.session_state.source = (EXAMPLES_DIR / name).read_text(encoding="utf-8")
     st.session_state.file_name = name
     st.session_state.processed = True
+    st.session_state.step = 0
     st.session_state.upload_error = None
 
 
@@ -128,6 +132,7 @@ def on_upload() -> None:
     st.session_state.file_name = uploaded.name
     st.session_state.upload_error = None
     st.session_state.processed = True
+    st.session_state.step = 0
 
 
 # --- page sections ---------------------------------------------------------------
@@ -220,8 +225,10 @@ def current_result() -> ProcessingResult:
     key = (source, options)
     if st.session_state.get("result_key") != key:
         if st.session_state.get("result_source") != source:
-                st.session_state.result = process(source, options)
+            st.session_state.step = 0
+        st.session_state.result = process(source, options)
         st.session_state.result_key = key
+        st.session_state.result_source = source
     return st.session_state.result
 
 
@@ -240,6 +247,7 @@ def render_results(result: ProcessingResult) -> None:
             "Cleaned Output",
             "FSM States",
             "Transition Log",
+            "Step-by-Step",
             "State Diagram",
             "Statistics",
             "Errors",
@@ -255,10 +263,12 @@ def render_results(result: ProcessingResult) -> None:
     with tabs[3]:
         views.render_log_tab(result)
     with tabs[4]:
-        views.render_diagram_tab(result)
+        views.render_step_tab(result)
     with tabs[5]:
-        views.render_statistics_tab(result)
+        views.render_diagram_tab(result)
     with tabs[6]:
+        views.render_statistics_tab(result)
+    with tabs[7]:
         views.render_errors_tab(result)
 
 

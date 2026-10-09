@@ -25,9 +25,11 @@ from remover import (
     Event,
     ProcessingResult,
     State,
+    TransitionRecord,
 )
-from remover.diagram import to_dot, to_mermaid
-from remover.display import excerpt, inline_text, log_to_csv, record_row
+from remover.diagram import edge_for, to_dot, to_mermaid
+from remover.display import excerpt, inline_text, log_to_csv, printable, printable_text, record_row
+from remover.states import ACCEPTING_STATES
 
 from . import html as fragments
 
@@ -324,6 +326,122 @@ def render_log_tab(result: ProcessingResult) -> None:
         mime="text/csv",
         icon=":material/table_view:",
     )
+
+
+# --- Step-by-Step --------------------------------------------------------------
+
+
+def _set_step(value: int) -> None:
+    st.session_state.step = value
+
+
+def _shift_step(delta: int, last: int) -> None:
+    st.session_state.step = max(0, min(last, st.session_state.get("step", 0) + delta))
+
+
+def _next_change(log: tuple[TransitionRecord, ...]) -> None:
+    current = st.session_state.get("step", 0)
+    for index in range(current + 1, len(log)):
+        if log[index].changed_state:
+            st.session_state.step = index
+            return
+    st.session_state.step = len(log) - 1
+
+
+def render_step_tab(result: ProcessingResult) -> None:
+    log = result.transition_log
+    if not log:
+        st.info("No transitions were recorded for this input.")
+        return
+    last = len(log) - 1
+    st.session_state.step = max(0, min(st.session_state.get("step", 0), last))
+    step = st.session_state.step
+
+    buttons = st.columns(6)
+    buttons[0].button("First", icon=":material/first_page:", on_click=_set_step, args=(0,),
+                      disabled=step == 0, width="stretch")
+    buttons[1].button("Previous", icon=":material/chevron_left:", on_click=_shift_step,
+                      args=(-1, last), disabled=step == 0, width="stretch")
+    buttons[2].button("Next", icon=":material/chevron_right:", on_click=_shift_step,
+                      args=(1, last), disabled=step == last, type="primary", width="stretch")
+    buttons[3].button("Last", icon=":material/last_page:", on_click=_set_step, args=(last,),
+                      disabled=step == last, width="stretch")
+    buttons[4].button("Next state change", icon=":material/fast_forward:", on_click=_next_change,
+                      args=(log,), disabled=step == last, width="stretch")
+    buttons[5].button("Reset", icon=":material/restart_alt:", on_click=_set_step, args=(0,),
+                      width="stretch")
+    if last > 0:
+        st.slider("Transition", 0, last, key="step")
+
+    record = log[st.session_state.step]
+    columns = st.columns(4)
+    columns[0].metric("Step", f"{record.step} of {last}")
+    columns[1].metric("Position", record.offset, help="0-based index of the character in the source.")
+    columns[2].metric("Line : Column", f"{record.line} : {record.column}")
+    columns[3].metric(
+        "Input character",
+        printable(record.character),
+        help=record.input_class.members if record.input_class else "End of input: no character is consumed.",
+    )
+
+    with st.container(border=True):
+        input_class = record.input_class.value if record.input_class else "END_OF_INPUT"
+        st.markdown(
+            f"**Current state:** `{record.current_state.value}` &nbsp;→&nbsp; "
+            f"**Next state:** `{record.next_state.value}` &nbsp;&nbsp; "
+            f"(input class `{input_class}`)"
+        )
+        st.markdown(f"**Action:** {record.action}")
+        details = [f"**Output:** {record.output.effect}"]
+        if record.emitted:
+            details.append(f"Emitted `{printable_text(record.emitted)}`")
+        if record.discarded:
+            details.append(f"Discarded `{printable_text(record.discarded)}`")
+        details.append(f"Buffer `{printable_text(record.buffer) or 'empty'}`")
+        st.markdown(" &nbsp;·&nbsp; ".join(details))
+        if record.event is not Event.NONE:
+            st.markdown(f"**Lexical event:** `{record.event.value}`")
+        if record.is_end_of_input:
+            verdict = "accepted" if record.current_state in ACCEPTING_STATES else "rejected (lexical error)"
+            st.markdown(f"**End of input:** the input is {verdict}.")
+
+    left, right = st.columns(2, gap="medium")
+    with left:
+        st.markdown("##### Source")
+        st.html(fragments.step_source(result, record))
+        st.caption(
+            "Boxed: the character this step consumes. Struck through: comment text already "
+            "discarded. Amber: the '/' held in the buffer. Faded: not read yet."
+        )
+    with right:
+        st.markdown("##### FSM output so far")
+        emitted = result.comment_free_source[: record.output_length]
+        if emitted:
+            show_code(emitted)
+        else:
+            st.caption("Nothing has been emitted yet.")
+
+    st.markdown("##### Machine")
+    st.graphviz_chart(
+        to_dot(active_state=record.next_state, active_edge=edge_for(_row_of(record))),
+        width="stretch",
+    )
+    st.caption("Highlighted in amber: the transition just taken and the state it leads to.")
+
+    st.markdown("##### Neighbouring transitions")
+    first = max(0, st.session_state.step - 3)
+    window = log[first : st.session_state.step + 4]
+    st.dataframe(
+        [{"": "▶" if r.step == record.step else "", **record_row(r)} for r in window],
+        hide_index=True,
+        column_config=_WIDE_COLUMNS,
+    )
+
+
+def _row_of(record: TransitionRecord):
+    if record.input_class is None:
+        return EOF_TABLE[record.current_state]
+    return TRANSITION_TABLE[(record.current_state, record.input_class)]
 
 
 # --- State Diagram -------------------------------------------------------------

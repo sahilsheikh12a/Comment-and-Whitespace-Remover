@@ -33,6 +33,23 @@ def test_highlighted_source_escapes_html_and_keeps_line_breaks():
     assert "\nint x;" in fragment
 
 
+def test_step_source_boxes_the_current_character_and_marks_the_buffer():
+    result = process("a/b; // c\r\nd;")
+    second_slash = result.transition_log[6]  # the second '/' of '//'
+    fragment = fragments.step_source(result, second_slash)
+    current = fragments.STYLES["current"]
+    buffered = fragments.STYLES["buffered"]
+    assert f'<span style="{current}">/</span>' in fragment
+    assert f'<span style="{buffered}">/</span>' in fragment
+    assert "\r" not in fragment  # line terminators are never written raw
+
+
+def test_step_source_shows_the_end_of_input_marker():
+    result = process("x;\n")
+    fragment = fragments.step_source(result, result.transition_log[-1])
+    assert "end of input" in fragment
+
+
 def test_pipeline_reports_rejected_input():
     fragment = fragments.pipeline(process("bad\x00input"))
     assert "rejected" in fragment
@@ -80,6 +97,7 @@ def test_processing_the_starter_code_shows_every_tab():
         "Cleaned Output",
         "FSM States",
         "Transition Log",
+        "Step-by-Step",
         "State Diagram",
         "Statistics",
         "Errors",
@@ -118,6 +136,24 @@ def test_changing_the_mode_updates_the_output():
     test.radio(key="whitespace_mode").set_value("compact").run()
     assert not test.exception
     assert displayed(test, "int a=10;\nint b=20;\nint sum=a+b;\n")
+
+
+def test_step_by_step_navigation():
+    test = app()
+    button(test, "Process Source").click().run()
+    for _ in range(3):
+        button(test, "Next").click().run()
+    assert test.session_state["step"] == 3
+    button(test, "Previous").click().run()
+    assert test.session_state["step"] == 2
+    button(test, "Next state change").click().run()
+    log = process(test.text_area(key="source").value).transition_log
+    assert log[test.session_state["step"]].changed_state
+    button(test, "Last").click().run()
+    assert test.session_state["step"] == len(log) - 1
+    button(test, "Reset").click().run()
+    assert test.session_state["step"] == 0
+    assert not test.exception
 
 
 def test_leading_blank_lines_of_the_output_are_displayed():

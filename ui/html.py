@@ -12,7 +12,7 @@ from __future__ import annotations
 import html
 from collections.abc import Iterable
 
-from remover import Comment, Literal, LiteralKind, ProcessingResult
+from remover import Comment, Literal, LiteralKind, ProcessingResult, State, TransitionRecord
 
 PRE_STYLE = (
     "font-family:'Source Code Pro',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"
@@ -28,6 +28,13 @@ STYLES = {
     ),
     "string": "background:rgba(34,197,94,0.20);",
     "character": "background:rgba(20,184,166,0.22);",
+    "buffered": "background:rgba(245,158,11,0.40);",
+    "current": (
+        "background:#f59e0b;color:#111827;border-radius:2px;"
+        "box-shadow:0 0 0 2px #d97706;"
+    ),
+    "unread": "opacity:0.42;",
+    "gutter": "opacity:0.45;user-select:none;",
 }
 
 LEGEND = [
@@ -35,6 +42,9 @@ LEGEND = [
     ("string", "string literal"),
     ("character", "character literal"),
 ]
+
+# How the current character is drawn in the step view when it is invisible.
+_VISIBLE_CURRENT = {" ": "␠", "\t": "⇥", "\n": "↵", "\r": "␍", "\f": "␌", "\v": "␋"}
 
 MAX_HIGHLIGHTED_CHARACTERS = 60_000
 
@@ -88,6 +98,68 @@ def legend() -> str:
         for key, label in LEGEND
     )
     return f'<div style="font-size:0.8rem;margin:0 0 0.4rem 0">{items}</div>'
+
+
+def line_starts(source: str) -> list[int]:
+    """Offsets where each line starts (LF, CR LF and CR end a line)."""
+    starts = [0]
+    i, n = 0, len(source)
+    while i < n:
+        ch = source[i]
+        if ch == "\r" and i + 1 < n and source[i + 1] == "\n":
+            i += 1
+        if ch in "\r\n":
+            starts.append(i + 1)
+        i += 1
+    return starts
+
+
+def step_source(
+    result: ProcessingResult,
+    record: TransitionRecord,
+    *,
+    context_lines: int = 8,
+) -> str:
+    """The source around the character consumed by ``record``.
+
+    Characters already consumed are shown by what they turned out to be,
+    the held '/' is marked as buffered, the current character is boxed and
+    unread characters are dimmed.
+    """
+    source = result.original_source
+    position = record.offset
+    classes = lexeme_classes(source, result.detected_comments, result.detected_literals)
+    for i in range(position, len(source)):
+        classes[i] = "unread"
+    if record.current_state is State.POSSIBLE_COMMENT and position > 0:
+        classes[position - 1] = "buffered"
+
+    starts = line_starts(source)
+    first_line = max(1, record.line - context_lines)
+    last_line = min(len(starts), record.line + context_lines)
+    width = len(str(last_line))
+    out: list[str] = []
+    for line_number in range(first_line, last_line + 1):
+        start = starts[line_number - 1]
+        end = starts[line_number] if line_number < len(starts) else len(source)
+        content_end = end
+        while content_end > start and source[content_end - 1] in "\r\n":
+            content_end -= 1
+        out.append(_span(f"{line_number:>{width}} │ ", "gutter"))
+        if start <= position < content_end:
+            ch = source[position]
+            out.append(_runs(source[start:position], classes[start:position]))
+            out.append(_span(_VISIBLE_CURRENT.get(ch, ch), "current"))
+            out.append(_runs(source[position + 1 : content_end], classes[position + 1 : content_end]))
+        else:
+            out.append(_runs(source[start:content_end], classes[start:content_end]))
+            if content_end <= position < end:  # the current character ends this line
+                out.append(_span(_VISIBLE_CURRENT[source[position]], "current"))
+        if line_number == last_line and record.is_end_of_input:
+            out.append(_span("⊣ end of input", "current"))
+        if line_number < last_line:
+            out.append("\n")
+    return f'<pre style="{PRE_STYLE}">{"".join(out)}</pre>'
 
 
 def pipeline(result: ProcessingResult) -> str:
