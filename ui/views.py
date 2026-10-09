@@ -76,6 +76,18 @@ def cleaned_file_name(file_name: str) -> str:
     return f"{path.stem}.cleaned{suffix}"
 
 
+def md_text(text: str) -> str:
+    """Escape text so Markdown shows it literally ('*' in '*/' must not start italics)."""
+    for ch in "\\`*_[]<>#|":
+        text = text.replace(ch, "\\" + ch)
+    return text
+
+
+def md_code(text: str) -> str:
+    """Inline code that survives backticks inside ``text``."""
+    return f"`` {text} ``" if "`" in text else f"`{text}`"
+
+
 def show_code(text: str) -> None:
     """Show source code exactly, with line numbers.
 
@@ -375,7 +387,11 @@ def render_step_tab(result: ProcessingResult) -> None:
 
     record = log[st.session_state.step]
     columns = st.columns(4)
-    columns[0].metric("Step", f"{record.step} of {last}")
+    columns[0].metric(
+        "Step",
+        f"{record.step} / {last}",
+        help="Steps are numbered from 0; the last step is the end-of-input transition.",
+    )
     columns[1].metric("Position", record.offset, help="0-based index of the character in the source.")
     columns[2].metric("Line : Column", f"{record.line} : {record.column}")
     columns[3].metric(
@@ -391,13 +407,13 @@ def render_step_tab(result: ProcessingResult) -> None:
             f"**Next state:** `{record.next_state.value}` &nbsp;&nbsp; "
             f"(input class `{input_class}`)"
         )
-        st.markdown(f"**Action:** {record.action}")
-        details = [f"**Output:** {record.output.effect}"]
+        st.markdown(f"**Action:** {md_text(record.action)}")
+        details = [f"**Output:** {md_text(record.output.effect)}"]
         if record.emitted:
-            details.append(f"Emitted `{printable_text(record.emitted)}`")
+            details.append(f"Emitted {md_code(printable_text(record.emitted))}")
         if record.discarded:
-            details.append(f"Discarded `{printable_text(record.discarded)}`")
-        details.append(f"Buffer `{printable_text(record.buffer) or 'empty'}`")
+            details.append(f"Discarded {md_code(printable_text(record.discarded))}")
+        details.append(f"Buffer {md_code(printable_text(record.buffer) or 'empty')}")
         st.markdown(" &nbsp;·&nbsp; ".join(details))
         if record.event is not Event.NONE:
             st.markdown(f"**Lexical event:** `{record.event.value}`")
@@ -552,6 +568,6 @@ def _render_diagnostic(diagnostic: Diagnostic, source: str, *, error: bool) -> N
         colour = "red" if error else "orange"
         kind = "Error" if error else "Warning"
         st.markdown(f":{colour}[**{kind}: {diagnostic.category.value}**] &nbsp; `{diagnostic.code.value}`")
-        st.code(diagnostic.format(), language="text")
+        st.code(diagnostic.format(), language="text", wrap_lines=True)
         if diagnostic.line is not None and diagnostic.column is not None:
             st.code(excerpt(source, diagnostic.line, diagnostic.column), language="text")

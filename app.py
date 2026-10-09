@@ -183,8 +183,9 @@ def render_input(examples: list[str]) -> None:
                 key="upload",
                 on_change=on_upload,
             )
-        if st.session_state.upload_error is not None:
-            st.error(st.session_state.upload_error.format())
+        error = st.session_state.upload_error
+        if error is not None:
+            st.error(f"**{error.category.value}:** {error.message}  \n{error.recovery}")
 
     with settings:
         whitespace = st.radio(
@@ -234,6 +235,7 @@ def current_result() -> ProcessingResult:
 
 def render_results(result: ProcessingResult) -> None:
     st.markdown("#### Processing pipeline")
+    st.caption("Results follow the editor and the selected modes: change either and they update.")
     st.html(fragments.pipeline(result))
     if result.errors:
         st.error(
