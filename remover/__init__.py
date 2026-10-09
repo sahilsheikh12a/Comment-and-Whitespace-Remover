@@ -5,11 +5,13 @@ Where things live:
     states.py           the FSM states (Q) and which of them accept
     transitions.py      the transition table: δ (next state) and λ (output)
     fsm.py              the engine that runs the table one character at a time
+    comment_remover.py  runs the FSM and collects comments, literals, errors
     models.py           the data structures passed between the stages
     errors.py           error classification and diagnostics
     text.py             character helpers: whitespace and line breaks
 """
 
+from .comment_remover import CommentRemovalResult, remove_comments
 from .errors import (
     Code,
     Diagnostic,
@@ -54,6 +56,7 @@ __all__ = [
     "Comment",
     "CommentFSM",
     "CommentKind",
+    "CommentRemovalResult",
     "Diagnostic",
     "EOF_TABLE",
     "ErrorCategory",
@@ -81,4 +84,5 @@ __all__ = [
     "TransitionRecord",
     "WhitespaceMode",
     "classify",
+    "remove_comments",
 ]
