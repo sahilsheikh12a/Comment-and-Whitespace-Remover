@@ -155,14 +155,3 @@ STATE_INFO: dict[State, StateInfo] = {
 
 #: States in which the input may legally end (the set F).
 ACCEPTING_STATES = frozenset(s for s, info in STATE_INFO.items() if info.accepting)
-COMMENT_STATES = frozenset(s for s, info in STATE_INFO.items() if info.region is Region.COMMENT)
-STRING_STATES = frozenset(s for s, info in STATE_INFO.items() if info.region is Region.STRING)
-CHARACTER_STATES = frozenset(
-    s for s, info in STATE_INFO.items() if info.region is Region.CHARACTER
-)
-LITERAL_STATES = STRING_STATES | CHARACTER_STATES
-
-
-def describe(state: State) -> StateInfo:
-    """Return the documentation entry for ``state``."""
-    return STATE_INFO[state]

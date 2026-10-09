@@ -438,11 +438,6 @@ def transition(state: State, ch: str) -> Transition:
     return TRANSITION_TABLE[(state, classify(ch))]
 
 
-def end_of_input(state: State) -> Transition:
-    """Return the end-of-input transition for ``state``."""
-    return EOF_TABLE[state]
-
-
 def transitions_from(state: State) -> list[Transition]:
     """All character transitions leaving ``state``, in input-class order."""
     return [TRANSITION_TABLE[(state, input_class)] for input_class in CharClass]

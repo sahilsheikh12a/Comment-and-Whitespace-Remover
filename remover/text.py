@@ -12,10 +12,6 @@ HORIZONTAL_WHITESPACE = frozenset(" \t\v\f")
 LINE_BREAK_CHARS = frozenset("\r\n")
 
 
-def is_whitespace(ch: str) -> bool:
-    return ch in HORIZONTAL_WHITESPACE or ch in LINE_BREAK_CHARS
-
-
 def line_breaks(text: str) -> list[str]:
     """Return the line terminators of ``text`` in order ("\\n", "\\r\\n" or "\\r")."""
     breaks: list[str] = []
