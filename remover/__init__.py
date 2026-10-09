@@ -7,6 +7,7 @@ Where things live:
     fsm.py              the engine that runs the table one character at a time
     comment_remover.py  runs the FSM and collects comments, literals, errors
     whitespace.py       whitespace processing (preserve / normalize / compact)
+    pipeline.py         validation -> FSM -> whitespace -> statistics
     models.py           the data structures passed between the stages
     errors.py           error classification and diagnostics
     text.py             character helpers: whitespace and line breaks
@@ -41,6 +42,7 @@ from .models import (
     TransitionRecord,
     WhitespaceMode,
 )
+from .pipeline import decode_source, process, validate_source
 from .states import STATE_INFO, State
 from .transitions import (
     EOF_TABLE,
@@ -87,7 +89,10 @@ __all__ = [
     "WhitespaceMode",
     "WhitespaceResult",
     "classify",
+    "decode_source",
+    "process",
     "process_whitespace",
     "remove_comments",
     "separator_reason",
+    "validate_source",
 ]
