@@ -11,6 +11,9 @@ Where things live:
     models.py           the data structures passed between the stages
     errors.py           error classification and diagnostics
     text.py             character helpers: whitespace and line breaks
+    diagram.py          state diagram and tables generated from transitions.py
+    display.py          formatting of transition records for the UI and CLI
+    __main__.py         command-line interface: python -m remover
 """
 
 from .comment_remover import CommentRemovalResult, remove_comments
