@@ -6,6 +6,7 @@ Where things live:
     transitions.py      the transition table: δ (next state) and λ (output)
     fsm.py              the engine that runs the table one character at a time
     comment_remover.py  runs the FSM and collects comments, literals, errors
+    whitespace.py       whitespace processing (preserve / normalize / compact)
     models.py           the data structures passed between the stages
     errors.py           error classification and diagnostics
     text.py             character helpers: whitespace and line breaks
@@ -49,6 +50,7 @@ from .transitions import (
     OutputAction,
     classify,
 )
+from .whitespace import WhitespaceResult, process_whitespace, separator_reason
 
 __all__ = [
     "CharClass",
@@ -83,6 +85,9 @@ __all__ = [
     "TRANSITION_TABLE",
     "TransitionRecord",
     "WhitespaceMode",
+    "WhitespaceResult",
     "classify",
+    "process_whitespace",
     "remove_comments",
+    "separator_reason",
 ]
