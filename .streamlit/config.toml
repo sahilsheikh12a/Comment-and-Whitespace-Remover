@@ -1,0 +1,7 @@
+# Local-only settings: no first-run e-mail prompt and no usage statistics,
+# so the app runs fully offline.
+[server]
+showEmailPrompt = false
+
+[browser]
+gatherUsageStats = false
